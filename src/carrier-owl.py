@@ -13,6 +13,14 @@ from fastprogress import progress_bar
 import slackweb
 import warnings
 import urllib.parse
+import random
+
+slack_conf = {
+    'channel': '#arxiv_stream',
+    # 'channel': '#bot-test',
+    'icon_emoji': ':uniguri_kun6:',
+    'username': 'carrier_owl',
+}
 
 # setting
 warnings.filterwarnings('ignore')
@@ -46,79 +54,41 @@ def get_articles_info(subject):
     return id_list
 
 
-def serch_keywords(id_list, keywords_dict):
-    urls = []
-    titles = []
-    abstracts = []
-    words = []
-    scores = []
-    for id_ in progress_bar(id_list):
-        a = id_.find('a')
-        _url = a.get('href')
-        url = 'https://arxiv.org'+_url
+def search_keywords(id_):
+    a = id_.find('a')
+    _url = a.get('href')
+    url = 'https://arxiv.org'+_url
 
-        response = requests.get(url)
-        html = response.text
+    response = requests.get(url)
+    html = response.text
 
-        bs = BeautifulSoup(html)
-        title = bs.find('meta', attrs={'property': 'og:title'})['content']
-        abstract = bs.find(
-                'meta',
-                attrs={'property': 'og:description'})['content']
+    bs = BeautifulSoup(html)
+    title = bs.find('meta', attrs={'property': 'og:title'})['content']
+    abstract = bs.find(
+        'meta',
+        attrs={'property': 'og:description'})['content']
 
-        sum_score = 0
-        hit_kwd_list = []
+    title_trans = get_translated_text('ja', 'en', title)
+    abstract = abstract.replace('\n', '')
+    abstract_trans = get_translated_text('ja', 'en', abstract)
+    abstract_trans = textwrap.wrap(abstract_trans, 40)  # 40行で改行
+    abstract_trans = '\n'.join(abstract_trans)
 
-        for word in keywords_dict.keys():
-            score = keywords_dict[word]
-            if word.lower() in abstract.lower():  # 全部小文字にすれば、大文字少文字区別しなくていい
-                sum_score += score
-                hit_kwd_list.append(word)
-        if sum_score != 0:
-            title_trans = get_translated_text('ja', 'en', title)
-            abstract = abstract.replace('\n', '')
-            abstract_trans = get_translated_text('ja', 'en', abstract)
-            abstract_trans = textwrap.wrap(abstract_trans, 40)  # 40行で改行
-            abstract_trans = '\n'.join(abstract_trans)
-
-            urls.append(url)
-            titles.append(title_trans)
-            abstracts.append(abstract_trans)
-            words.append(hit_kwd_list)
-            scores.append(sum_score)
-
-    results = [urls, titles, abstracts, words, scores]
+    results = [url, title_trans, abstract_trans]
 
     return results
 
 
 def send2slack(results, slack):
-    urls = results[0]
-    titles = results[1]
-    abstracts = results[2]
-    words = results[3]
-    scores = results[4]
+    url = results[0]
+    title = results[1]
+    abstract = results[2]
 
-    # rank
-    idxs_sort = np.argsort(scores)
-    idxs_sort = idxs_sort[::-1]
-
-    # 通知
-    star = '*'*120
-    today = datetime.date.today()
-    text = f'{star}\n \t \t {today}\n{star}'
-    slack.notify(text=text)
-    for i in idxs_sort:
-        url = urls[i]
-        title = titles[i]
-        abstract = abstracts[i]
-        word = words[i]
-        score = scores[i]
-
-        text_slack = f'''
-                    \n score: `{score}`\n hit keywords: `{word}`\n url: {url}\n title:    {title}\n abstract: \n \t {abstract}\n{star}
-                       '''
-        slack.notify(text=text_slack)
+    text_slack = f'''url: {url}
+title: {title}
+abstract:
+\t {abstract}'''
+    slack.notify(text=text_slack, **slack_conf)
 
 
 def get_translated_text(from_lang, to_lang, from_text):
@@ -179,8 +149,10 @@ def get_config():
 def main():
     config = get_config()
     slack = slackweb.Slack(url=config['slack_id'])
-    id_list = get_articles_info(config['subject'])
-    results = serch_keywords(id_list, config['keywords'])
+    subject = random.choice(config['subject'])
+    id_list = get_articles_info(subject)
+    id_ = random.choice(id_list)
+    results = search_keywords(id_)
     send2slack(results, slack)
 
 

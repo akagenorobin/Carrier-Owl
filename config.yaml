@@ -2,10 +2,12 @@
 slack_id: 'your webhook url'
 
 # arxivの学問領域の指定
-subject: 'cs'
-
-# 検索キーワード
-keywords:
-        kaggle: 3
-        resnet: 3
-        anomaly detection: 1
+subject:
+  - 'physics.comp-ph'
+  - 'physics.data-an'
+  - 'cond-mat.dis-nn'
+  - 'cond-mat.stat-mech'
+  - 'cs.AI'
+  - 'cs.CC'
+  - 'cs.DS'
+  - 'cs.LG'
